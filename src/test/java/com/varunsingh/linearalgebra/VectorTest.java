@@ -1,7 +1,6 @@
 package com.varunsingh.linearalgebra;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -29,7 +28,7 @@ public class VectorTest {
         Vector x = new Vector(new double[] { 4, 5, 6 });
         Vector y = new Vector(new double[] { 6, -2, -3 });
 
-        double lengthOfSum = x.plus(y).asRowVector().calcLength();
+        double lengthOfSum = x.plus(y).calcLength();
         double sumOfLengths = x.calcLength() + y.calcLength();
 
         assertTrue(lengthOfSum <= sumOfLengths);
@@ -45,7 +44,7 @@ public class VectorTest {
         Vector x = new Vector(new double[] { 4, 5, 6 });
         Vector y = x.scale(6);
 
-        double lengthOfSum = x.plus(y).asColumnVector().calcLength();
+        double lengthOfSum = x.plus(y).calcLength();
         double sumOfLengths = x.calcLength() + y.calcLength();
 
         assertEquals(lengthOfSum, sumOfLengths, 0.0);
@@ -107,7 +106,15 @@ public class VectorTest {
         Vector c = new Vector(new double[] { -1, -9, 8 });
 
         Vector tripleCrossProduct = a.cross(b.cross(c));
-        Vector lagrangeFormulaRightHandSide = b.scale(a.dot(c)).minus(c.scale(a.dot(b))).asColumnVector(); 
+        Vector lagrangeFormulaRightHandSide = b
+            .scale(
+                a.dot(c)
+            )
+            .minus(
+                c.scale(
+                    a.dot(b)
+                )
+            ); 
 
         assertEquals(lagrangeFormulaRightHandSide, tripleCrossProduct);
     }

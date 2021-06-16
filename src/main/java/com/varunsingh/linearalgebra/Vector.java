@@ -1,7 +1,10 @@
 package com.varunsingh.linearalgebra;
 
-public class Vector extends Matrix {
+import java.util.Arrays;
+
+public class Vector implements Dataset {
     private double[] vectorElements;
+    private double average;
 
     public enum VectorType {
         ROW, COLUMN
@@ -10,75 +13,132 @@ public class Vector extends Matrix {
     private VectorType vectorType;
 
     public Vector(double[] v) {
-        super(loadVectorElements(v));
         vectorElements = v;
         vectorType = VectorType.COLUMN;
+        average = calcAverage();
     }
 
     public Vector(double[] v, VectorType t) {
-        super(t == VectorType.ROW ? new double[][] { v } : loadVectorElements(v));
+        vectorElements = v;
         vectorType = t;
+        average = calcAverage();
     }
 
-    private static double[][] loadVectorElements(double[] v) {
-        double[][] toConstruct = new double[v.length][1];
-        for (int i = 0; i < toConstruct.length; i++) {
-            toConstruct[i][0] = v[i];
-        }
-        return toConstruct;
+    @Override
+    public boolean equals(Object o) {
+        return Arrays.equals(getValues(), ((Vector) o).getValues());
     }
 
-    public Vector scale(double scalar) {
-        return super.scale(scalar).asColumnVector();
+    public double getAverage() {
+        return average;
     }
 
+    @Override
     public Vector transpose() {
         switch (vectorType) {
             case COLUMN:
-                return super.transpose().asRowVector();
+                return new Vector(vectorElements, VectorType.COLUMN);
             case ROW:
             default:
-                return super.transpose().asColumnVector();
+                return new Vector(vectorElements, VectorType.ROW);
         }
     }
 
     /**
-     * Converts matrix to a column vector
+     * Converts column vector in matrix form to a column vector
      */
     public static Vector valueOf(Matrix m) {
         Vector columnVector = new Vector(new double[m.getRows()]);
 
         for (int i = 0; i < m.getRows(); i++) {
-            for (int j = 0; j < m.getColumns(); j++) {
-                columnVector.set(i, 0, m.get(i, j));
-            }
+            columnVector.set(i, m.get(i, 0));
         }
 
         return columnVector;
     }
 
-    public double[] getVectorElements() {
+    /**
+     * Gets the elements in the dataset
+     * 
+     * @return The elements in a double array
+     */
+    public double[] getValues() {
         return vectorElements;
     }
 
-    public void setVectorElements(double[] newVector) {
+    public void setValues(double[] newVector) {
         vectorElements = newVector;
     }
 
     public double get(int index) {
+        return vectorElements[index];
+    }
+
+    public void set(int rowIndex, double newValue) {
+        vectorElements[rowIndex] = newValue;
+    }
+
+    @Override
+    public Dataset times(Dataset factor) {
+        if (getColumns() != factor.getRows())
+            throw new IllegalArgumentException();
+
         switch (vectorType) {
-            case ROW:
-                return getMatrixElements()[0][index];
+            case ROW: {
+                Vector product = new Vector(new double[getColumns()], VectorType.ROW);
+                Matrix mFactor = factor instanceof Matrix ? (Matrix) factor : new Matrix(new double[][] { ((Vector) factor).getValues() });
+                
+                for (int j = 0; j < factor.getColumns(); j++) {
+                    double sum = 0;
+
+                    for (int k = 0; k < getColumns(); k++) {
+
+                        double firstFactor = vectorElements[k];
+                        double secondFactor = mFactor.get(k, j);
+
+                        sum += firstFactor * secondFactor;
+                    }
+
+                    product.set(j, sum);
+                }
+
+                return product;
+            }
             case COLUMN:
-            default:
-                return getMatrixElements()[index][0];
+            default: {
+                Matrix product = new Matrix(new double[getRows()][factor.getColumns()]);
+                Vector vFactor = factor instanceof Vector ? (Vector) factor : ((Matrix) factor).getRow(0);
+
+                for (int i = 0; i < getRows(); i++) {
+                    for (int j = 0; j < factor.getColumns(); j++) {
+                        product.set(i, j, get(i) * vFactor.get(j));
+                    }
+                }
+
+                return product;
+            }
         }
     }
 
-    public void setVectorElement(int rowIndex, double newValue) {
-        double[][] temp = getMatrixElements();
-        temp[rowIndex][0] = newValue;
-        setMatrixElements(temp);
+    @Override
+    public Vector scale(double scalar) {
+        return new Vector(Arrays.stream(vectorElements).map(v -> v * scalar).toArray());
+    }
+
+    @Override
+    public Vector plus(Dataset addend) {
+        Vector sum = new Vector(new double[getSize()]);
+
+        for (int i = 0; i < vectorElements.length; i++) {
+            sum.set(i, get(i) + ((Vector) addend).get(i));
+        }
+
+        return sum;
+    }
+
+    @Override
+    public Vector minus(Dataset subtrahend) {
+        return plus(subtrahend.scale(-1));
     }
 
     public double calcInnerProduct() {
@@ -102,28 +162,32 @@ public class Vector extends Matrix {
      * @param y The vector to multiply this vector by
      * @return A matrix of the outer product
      */
-    public Matrix calcOuterProduct(Vector y) {
+    public Dataset calcOuterProduct(Vector y) {
         return this.times(y.transpose());
+    }
+
+    int getSize() {
+        return vectorElements.length;
     }
 
     /**
      * Gets the size of the vector
      * 
-     * @return the numbers of rows if this is a column vector and the number of
-     *         columns if this is a row vector
+     * @return 1 if a row vector, otherwise length of {@link #vectorElements}
      */
-    int getSize() {
-        return vectorType == VectorType.ROW ? getColumns() : getRows();
+    @Override
+    public int getRows() {
+        return vectorType == VectorType.ROW ? 1 : vectorElements.length;
     }
 
-    public double calcExpectedValue() {
-        double sum = 0;
-
-        for (int i = 0; i < getSize(); i++) {
-            sum += get(i);
-        }
-
-        return sum / getSize();
+    /**
+     * Gets the number of columns in the vector
+     * 
+     * @return 1 if a column vector, otherwise length of {@link #vectorElements}
+     */
+    @Override
+    public int getColumns() {
+        return vectorType == VectorType.COLUMN ? 1 : vectorElements.length;
     }
 
     public double calcCovarianceIn2x2Matrix(Vector v2) {
@@ -138,6 +202,7 @@ public class Vector extends Matrix {
     public double calcLength() {
         return Math.sqrt(dot());
     }
+
     /**
      * Calculates the norm of a vector
      * 
@@ -182,6 +247,7 @@ public class Vector extends Matrix {
 
     /**
      * Evaluates the cross product of this and another vector
+     * 
      * @param y The second factor
      * @return The vector cross product
      */
@@ -189,12 +255,62 @@ public class Vector extends Matrix {
         if (getSize() != 3 || y.getSize() != 3)
             throw new IllegalArgumentException("Vector must have 3 elements to be crossable");
 
-        Vector crossProduct = new Vector(new double[3]);
-
-        crossProduct.setVectorElement(0, get(1) * y.get(2) - get(2) * y.get(1));
-        crossProduct.setVectorElement(1, get(2) * y.get(0) - get(0) * y.get(2));
-        crossProduct.setVectorElement(2, get(0) * y.get(1) - get(1) * y.get(0));
-
+        Vector crossProduct = new Vector(new double[] {
+            get(1) * y.get(2) - get(2) * y.get(1),
+            get(2) * y.get(0) - get(0) * y.get(2),
+            get(0) * y.get(1) - get(1) * y.get(0)
+        });
+        
         return crossProduct;
+    }
+
+    /**
+     * Calculates E(this)
+     * 
+     * @see {@link #calcAverage()}
+     */
+    public double calcExpectedValue() {
+        return calcAverage();
+    }
+
+    /**
+     * Calculates the summation(i=1, xi)/N
+     * 
+     * @return The average of the elements of this dataset
+     */
+    private double calcAverage() {
+        double sumOfValues = 0;
+
+        for (int i = 0; i < getSize(); i++) {
+            sumOfValues += get(i);
+        }
+
+        return sumOfValues /= getSize();
+    }
+
+    /**
+     * Around 100% of values are between positive and negative sigma squared
+     * 
+     * @return The positive variance (Sigma^2)
+     */
+    public double calcVariance() {
+        double average = calcAverage();
+        double deviationSum = 0;
+
+        for (int i = 0; i < getSize(); i++) {
+            double deviation = Math.abs(average - get(i));
+            deviationSum += deviation * deviation;
+        }
+
+        return MatrixRound.roundDouble(deviationSum / getSize(), 5);
+    }
+
+    /**
+     * Around 68.3% of all values are between positive and negative sigma
+     * 
+     * @return The positive standard deviation (Sigma)
+     */
+    public double calcStandardDeviation() {
+        return Math.sqrt(calcVariance());
     }
 }
